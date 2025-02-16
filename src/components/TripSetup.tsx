@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Calendar, Plus, X, CloudRain, Thermometer, Wind, Sun } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { MapPin, Calendar, Plus, X, CloudRain, Thermometer, Wind, Save, FolderOpen } from 'lucide-react';
 import { useTripContext } from '../context/TripContext';
+import { useAuth } from '../context/AuthContext';
 import { Loader } from '@googlemaps/js-api-loader';
 import axios from 'axios';
+import SaveListModal from './SaveListModal';
+import SavedLists from './SavedLists';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const VISUAL_CROSSING_API_KEY = import.meta.env.VITE_VISUAL_CROSSING_API_KEY;
@@ -36,9 +39,7 @@ interface WeatherData {
   wind_speed: number;
   description: string;
   icon: string;
-  precip: number;
-  conditions: string;
-  cloudcover: number;
+  pop: number;
 }
 
 interface Destination {
@@ -53,6 +54,22 @@ interface Destination {
   lastSearched?: string;
 }
 
+function getWeatherIcon(condition: string): string {
+  const iconMap: { [key: string]: string } = {
+    'clear-day': '01d',
+    'clear-night': '01n',
+    'partly-cloudy-day': '02d',
+    'partly-cloudy-night': '02n',
+    'cloudy': '03d',
+    'rain': '10d',
+    'snow': '13d',
+    'sleet': '13d',
+    'wind': '50d',
+    'fog': '50d',
+  };
+  return iconMap[condition.toLowerCase()] || '01d';
+}
+
 function TripSetup() {
   const { updateTrip, trip, packingLists } = useTripContext();
   const [currentStep, setCurrentStep] = useState(1);
@@ -61,8 +78,11 @@ function TripSetup() {
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [companion, setCompanion] = useState('');
   const [showPackingList, setShowPackingList] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showSavedLists, setShowSavedLists] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
+  const { isAuthenticated } = useAuth();
   const [dates, setDates] = useState(() => {
     const today = new Date();
     const thursday = new Date(today);
@@ -143,22 +163,6 @@ function TripSetup() {
     };
   }, [destinations.length]);
 
-  const getWeatherIcon = (conditions: string) => {
-    const conditionsLower = conditions.toLowerCase();
-    if (conditionsLower.includes('rain') || conditionsLower.includes('drizzle')) {
-      return '🌧️';
-    } else if (conditionsLower.includes('snow')) {
-      return '🌨️';
-    } else if (conditionsLower.includes('cloud')) {
-      return '☁️';
-    } else if (conditionsLower.includes('thunder') || conditionsLower.includes('storm')) {
-      return '⛈️';
-    } else if (conditionsLower.includes('fog') || conditionsLower.includes('mist')) {
-      return '🌫️';
-    }
-    return '☀️';
-  };
-
   const fetchWeather = async (coordinates: { lat: number; lng: number }, index: number) => {
     if (!VISUAL_CROSSING_API_KEY) {
       console.error('Visual Crossing API key is missing');
@@ -167,21 +171,30 @@ function TripSetup() {
 
     try {
       const response = await axios.get(
-        `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${coordinates.lat},${coordinates.lng}/${dates.start}/${dates.end}?unitGroup=metric&include=days&key=${VISUAL_CROSSING_API_KEY}&contentType=json`
+        `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${coordinates.lat},${coordinates.lng}/${dates.start}/${dates.end}?key=${VISUAL_CROSSING_API_KEY}&unitGroup=metric&include=days`,
+        { 
+          headers: { 'Accept-Encoding': 'gzip' }
+        }
       );
 
-      const weatherForecast = response.data.days.map((day: any) => ({
-        date: day.datetime,
-        temp: Math.round(day.temp),
-        feels_like: Math.round(day.feelslike),
-        humidity: day.humidity,
-        wind_speed: Math.round(day.windspeed),
-        description: day.conditions,
-        icon: getWeatherIcon(day.conditions),
-        precip: Math.round(day.precip * 100),
-        conditions: day.conditions,
-        cloudcover: day.cloudcover
-      }));
+      if (!response.data || !response.data.days) {
+        console.error('Invalid weather data format:', response.data);
+        return;
+      }
+
+      const weatherForecast = response.data.days.map((day: any) => {
+        const data = {
+          date: day.datetime,
+          temp: Math.round(day.temp),
+          feels_like: Math.round(day.feelslike),
+          humidity: day.humidity,
+          wind_speed: Math.round(day.windspeed),
+          description: day.conditions || 'No description available',
+          icon: `https://openweathermap.org/img/wn/${getWeatherIcon(day.icon || 'clear-day')}@2x.png`,
+          pop: Math.round(day.precipprob || 0)
+        };
+        return JSON.parse(JSON.stringify(data));
+      });
 
       setDestinations(prev => {
         const updated = [...prev];
@@ -334,60 +347,6 @@ function TripSetup() {
     }
   };
 
-  const WeatherCard = ({ weather }: { weather: WeatherData }) => (
-    <div className="bg-white p-4 rounded-lg shadow-sm border border-slate/10">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-slate">
-          {new Date(weather.date).toLocaleDateString(undefined, { 
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-          })}
-        </span>
-        <span className="text-2xl" role="img" aria-label={weather.conditions}>
-          {weather.icon}
-        </span>
-      </div>
-      
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-slate">
-            <Thermometer className="h-4 w-4" />
-            <span className="text-lg font-semibold">{weather.temp}°C</span>
-          </div>
-          <span className="text-sm text-slate/60">
-            Feels like {weather.feels_like}°C
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 text-slate">
-          <CloudRain className="h-4 w-4" />
-          <span className="text-sm">
-            {weather.precip}% chance of rain
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 text-slate">
-          <Wind className="h-4 w-4" />
-          <span className="text-sm">
-            {weather.wind_speed} km/h
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 text-slate">
-          <Sun className="h-4 w-4" />
-          <span className="text-sm">
-            {100 - weather.cloudcover}% clear
-          </span>
-        </div>
-
-        <div className="text-sm text-slate/80">
-          {weather.conditions}
-        </div>
-      </div>
-    </div>
-  );
-
   if (showPackingList && trip) {
     const packingItems = generatePackingList();
 
@@ -395,12 +354,32 @@ function TripSetup() {
       <div className="bg-white rounded-xl shadow-lg p-6 max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-semibold text-slate">Your Packing List</h2>
-          <button
-            onClick={() => setShowPackingList(false)}
-            className="text-sm text-coral hover:text-coral/80"
-          >
-            Edit Trip Details
-          </button>
+          <div className="flex items-center space-x-4">
+            {isAuthenticated && (
+              <>
+                <button
+                  onClick={() => setShowSaveModal(true)}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-slate hover:text-turquoise transition-colors"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save List
+                </button>
+                <button
+                  onClick={() => setShowSavedLists(true)}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-slate hover:text-turquoise transition-colors"
+                >
+                  <FolderOpen className="h-4 w-4 mr-2" />
+                  Open Saved
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setShowPackingList(false)}
+              className="text-sm text-coral hover:text-coral/80"
+            >
+              Edit Trip Details
+            </button>
+          </div>
         </div>
 
         <div className="mb-6 p-4 bg-slate/5 rounded-lg">
@@ -448,6 +427,9 @@ function TripSetup() {
             </ul>
           </section>
         </div>
+
+        {showSaveModal && <SaveListModal onClose={() => setShowSaveModal(false)} />}
+        {showSavedLists && <SavedLists onClose={() => setShowSavedLists(false)} />}
       </div>
     );
   }
@@ -563,7 +545,48 @@ function TripSetup() {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {destination.weatherData.map((weather, wIndex) => (
-                      <WeatherCard key={wIndex} weather={weather} />
+                      <div key={wIndex} className="bg-white p-4 rounded-lg shadow-sm border border-slate/10">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-slate">
+                            {new Date(weather.date).toLocaleDateString(undefined, { 
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                          <img src={weather.icon} alt={weather.description} className="w-12 h-12" />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1 text-slate">
+                              <Thermometer className="h-4 w-4" />
+                              <span className="text-lg font-semibold">{weather.temp}°C</span>
+                            </div>
+                            <span className="text-sm text-slate/60">
+                              Feels like {weather.feels_like}°C
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-slate">
+                            <CloudRain className="h-4 w-4" />
+                            <span className="text-sm">
+                              {weather.pop}% chance of rain
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-slate">
+                            <Wind className="h-4 w-4" />
+                            <span className="text-sm">
+                              {weather.wind_speed} m/s
+                            </span>
+                          </div>
+
+                          <div className="text-sm text-slate/80">
+                            {weather.description.charAt(0).toUpperCase() + weather.description.slice(1)}
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>

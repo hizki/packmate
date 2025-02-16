@@ -38,10 +38,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      console.error('Error loading stored user:', error);
+      localStorage.removeItem('user'); // Clear potentially corrupted data
     }
   }, []);
 
@@ -59,8 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <GoogleOAuthProvider 
       clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
-      onScriptLoadError={() => console.log('Google Sign-In script failed to load')}
-      onScriptLoadSuccess={() => console.log('Google Sign-In script loaded successfully')}
+      onScriptLoadError={() => {
+        console.warn('Google Sign-In script failed to load. Guest mode is still available.');
+      }}
     >
       <AuthContext.Provider 
         value={{ 

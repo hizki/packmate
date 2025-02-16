@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { useAuth } from '../context/AuthContext';
@@ -12,12 +12,23 @@ interface GoogleUser {
 
 export default function Login() {
   const { setUser, setIsAuthenticated, continueAsGuest } = useAuth();
+  const [error, setError] = useState<string | null>(null);
 
   const handleSuccess = (credentialResponse: any) => {
-    const decoded = jwtDecode<GoogleUser>(credentialResponse.credential);
-    setUser(decoded);
-    setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(decoded));
+    try {
+      const decoded = jwtDecode<GoogleUser>(credentialResponse.credential);
+      setUser(decoded);
+      setIsAuthenticated(true);
+      localStorage.setItem('user', JSON.stringify(decoded));
+      setError(null);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Failed to process login. Please try again or continue as guest.');
+    }
+  };
+
+  const handleError = () => {
+    setError('Login failed. Please try again or continue as guest.');
   };
 
   return (
@@ -34,9 +45,15 @@ export default function Login() {
         </div>
         
         <div className="space-y-4">
+          {error && (
+            <div className="p-3 bg-coral/10 border border-coral/20 rounded-lg">
+              <p className="text-sm text-coral">{error}</p>
+            </div>
+          )}
+
           <GoogleLogin
             onSuccess={handleSuccess}
-            onError={() => console.log('Login Failed')}
+            onError={handleError}
             useOneTap
           />
           
