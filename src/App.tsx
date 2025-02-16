@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon } from 'lucide-react';
+import { Settings as SettingsIcon, LogOut } from 'lucide-react';
 import TripSetup from './components/TripSetup';
 import Settings from './components/Settings';
+import Login from './components/Login';
 import { TripProvider } from './context/TripContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-function App() {
+function AppContent() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { isAuthenticated, user, logout } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   return (
     <TripProvider>
@@ -21,14 +28,27 @@ function App() {
                 />
                 <h1 className="text-2xl font-bold text-slate">Packmate</h1>
               </div>
-              <nav className="flex items-center space-x-4">
-                <button 
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="text-slate hover:text-slate/80"
-                >
-                  <SettingsIcon className="h-6 w-6" />
-                </button>
-              </nav>
+              <div className="flex items-center space-x-4">
+                <span className="text-slate">{user?.name}</span>
+                <nav className="flex items-center space-x-4">
+                  <button 
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="text-slate hover:text-slate/80"
+                    title="Open Settings"
+                    aria-label="Open Settings"
+                  >
+                    <SettingsIcon className="h-6 w-6" />
+                  </button>
+                  <button 
+                    onClick={logout}
+                    className="text-slate hover:text-slate/80"
+                    title="Sign Out"
+                    aria-label="Sign Out"
+                  >
+                    <LogOut className="h-6 w-6" />
+                  </button>
+                </nav>
+              </div>
             </div>
           </div>
         </header>
@@ -40,6 +60,14 @@ function App() {
         <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       </div>
     </TripProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
