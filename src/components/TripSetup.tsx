@@ -227,15 +227,23 @@ function TripSetup() {
       clearTimeout(searchTimeoutRef.current[index]);
     }
 
+    console.log('Updating destination with value:', value);
     setDestinations(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], place: value };
+      const isDisabled = updated.some(d => !d.place);
+      console.log('Updated destinations:', updated);
+      console.log('Current step:', currentStep);
+      console.log('Button should be disabled:', isDisabled);
+      console.log('Destination places:', updated.map(d => d.place));
       return updated;
     });
 
     if (value.trim() && value !== destinations[index].lastSearched) {
       searchTimeoutRef.current[index] = setTimeout(() => {
+        console.log('Geocoding address:', value);
         geocoderRef.current?.geocode({ address: value }, (results, status) => {
+          console.log('Geocoding status:', status);
           if (status === 'OK' && results && results[0]) {
             const location = results[0].geometry.location;
             const coordinates = {
@@ -672,7 +680,7 @@ function TripSetup() {
         </div>
       )}
 
-      <div className="mt-8 flex justify-end">
+      <div className="mt-8 flex justify-end sticky bottom-0 left-0 right-0 bg-white p-4 border-t border-slate/20 z-50 shadow-lg">
         {currentStep > 1 && (
           <button
             onClick={() => setCurrentStep(prev => prev - 1)}
@@ -688,11 +696,18 @@ function TripSetup() {
             (currentStep === 2 && (!dates.start || !dates.end)) ||
             (currentStep === 3 && (!accommodation || selectedActivities.length === 0 || !companion))
           }
-          className="px-6 py-2 bg-coral text-white rounded-lg hover:bg-coral/90 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`px-6 py-2 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-offset-2 [background-color:inherit]:bg-coral ${
+            (currentStep === 1 && destinations.some(d => !d.place)) ||
+            (currentStep === 2 && (!dates.start || !dates.end)) ||
+            (currentStep === 3 && (!accommodation || selectedActivities.length === 0 || !companion))
+              ? '!bg-slate/40 cursor-not-allowed'
+              : '!bg-coral hover:!bg-coral/90 focus:ring-coral'
+          }`}
         >
           {currentStep === 3 ? 'Create List' : 'Next'}
         </button>
       </div>
+      <div className="h-20" /> {/* Spacer to prevent content from being hidden behind sticky button */}
     </div>
   );
 }

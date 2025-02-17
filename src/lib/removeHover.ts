@@ -9,17 +9,31 @@ const removeHoverStyles = () => {
     // Remove hover styles when touch is detected
     const style = document.createElement('style');
     style.innerHTML = `
+      /* Preserve layout but disable hover effects */
       .touch-device *:hover {
-        all: unset !important;
+        transform: none !important;
+        transition: none !important;
       }
       
-      /* Reset any specific hover styles */
-      .touch-device *[class*="hover:"] {
+      /* Target specific hover classes */
+      .touch-device [class*="hover:"] {
         transition: none !important;
-        transform: none !important;
-        box-shadow: none !important;
+      }
+
+      /* Keep button states visible */
+      .touch-device button:active,
+      .touch-device [role="button"]:active {
+        opacity: 0.7;
+      }
+
+      /* Prevent unwanted hover effects on cards and interactive elements */
+      .touch-device .hover\\:bg-slate\\/5:hover {
         background: inherit !important;
-        color: inherit !important;
+      }
+
+      /* Ensure touch feedback is visible but not disruptive */
+      .touch-device *:active {
+        transform: none !important;
       }
     `;
     document.head.appendChild(style);

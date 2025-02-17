@@ -6,39 +6,61 @@
   /* Prevent overscroll/bounce effect */
   html {
     height: 100%;
-    overflow: hidden;
-    position: fixed;
     width: 100%;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
   }
 
   body {
     -webkit-tap-highlight-color: transparent;
     height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    position: fixed;
     width: 100%;
-    /* Prevent overscroll in Safari */
-    overscroll-behavior-y: none;
+    margin: 0;
+    overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
+    /* Add padding for status bar in iOS */
+    padding-top: env(safe-area-inset-top);
+    background-color: #000C3F;
   }
 
+  /* Ensure root takes full height and respects safe areas */
   #root {
-    height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    overscroll-behavior-y: none;
+    min-height: 100%;
+    width: 100%;
+    /* Add padding for status bar and other safe areas */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    /* Fallback padding if env() is not supported */
+    padding: 20px 0 0 0;
+    /* Use the newer padding when supported */
+    @supports (padding: env(safe-area-inset-top)) {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+  }
+
+  /* Add a utility class for components that need to be under the status bar */
+  .under-status-bar {
+    margin-top: env(safe-area-inset-top);
   }
 }
 
+/* Only disable specific hover effects on touch devices */
 @media (hover: none) {
-  /* Remove hover styles for touch devices */
-  [class*="hover:"] {
-    @apply !opacity-100 !translate-y-0 !scale-100;
+  /* Disable background color changes on hover */
+  [class*="hover:bg-"] {
+    @apply !bg-inherit;
   }
   
-  [class*="hover:"]:hover {
-    @apply !bg-transparent !text-inherit !shadow-none;
+  /* Disable scale transforms on hover */
+  [class*="hover:scale-"] {
+    @apply !transform-none;
+  }
+  
+  /* Disable opacity changes on hover */
+  [class*="hover:opacity-"] {
+    @apply !opacity-100;
+  }
+  
+  /* Disable shadow changes on hover */
+  [class*="hover:shadow-"] {
+    @apply !shadow-none;
   }
 }
